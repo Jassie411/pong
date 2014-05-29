@@ -2,39 +2,29 @@ import pygame, sys, random
 from pygame.locals import *
 
 pygame.init()
-#pygame.display.init()
-#pygame.font.init()
 
 #Define helper functions
-#Picks the direction for the first ball spawn
-def random_direction():
-    d = random.randint(0, 1)
-    if d == 0:
-        return "left"
-    else:
-        return "right"
+#Spawn ball function
+def spawn_ball(direction = random.choice('01')):
+    #direction should always be left if AI is enabled for paddle2.
+    #0 is left, 1 is right
+    if direction == 0:
+        return (random.uniform(1.0, 3.0) * -1, random.uniform(1.0, 3.0) * -1)
+    elif direction == 1:
+        return (random.uniform(1.0, 3.0), random.uniform(1.0, 3.0) * -1)
 
-#Uses random_direction and decides how fast the first ball travels
-#It is also used in Ball class to pick velocity for every ball that spawns after
-def spawn_ball(direction):
-    velocity = [0, 0]
-    if direction == "left":
-        velocity[0] = (random.randrange(120, 240) / 60.0) * -1
-        velocity[1] = (random.randrange(60, 180) / 60.0) * -1
-    elif direction == "right":
-        velocity[0] = random.randrange(120, 240) / 60.0
-        velocity[1] = (random.randrange(60, 180) / 60.0) * -1
-    return velocity
-
-#Can be used to determine the size of the Pong table
-def canvas_size(sl, width = 300, height = 200):
-    if sl == "small":
+#Select canvas size. Will be useful when I make UI
+def canvas_size(str_size, width = 300, height = 200):
+    #All sizes are multiples of 300 for width, and 200 for height
+    if str_size == 'small':
         return (width * 2, height * 2)
-    elif sl == "large":
+    #Medium is simply width * 3
+    elif str_size == 'medium':
         return (width * 3, height * 2)
+    #Large will be a thing when I add support for a second ball
 
 #Classes
-#Canvas class. Handles gutter info, canvas size, and static lines
+#Canvas class. Handles gutter info, canvas size, static lines, and eventually images(maybe)
 class Canvas:
     def __init__(self, name, size, gutter_width, color, line_color):
         self.name = name
@@ -42,151 +32,117 @@ class Canvas:
         self.gutter_width = gutter_width
         self.line_width = 2
         self.line_color = line_color
-        self.width = self.size[0]
-        self.height = self.size[1]
+        self.width, self.height = self.size
+        self.center = (self.width // 2, self.height // 2)
+        self.half_width, self.half_height = self.center
         self.canvas_color = color
-        self.center = [self.width // 2, self.height // 2]
-
-    def get_name(self):
-        return self.name
-    def get_size(self):
-        return self.size
-    def get_width(self):
-        return self.width
-    def get_half_width(self):
-        return self.width // 2
-    def get_height(self):
-        return self.height
-    def get_half_height(self):
-        return self.height // 2
-    def get_center(self):
-        return self.center
-    def get_color(self):
-        return self.canvas_color
-    def get_gutter_width(self):
-        return self.gutter_width
-    def get_line_color(self):
-        return self.line_color
 
     def draw(self, canvas):
-            pygame.draw.line(canvas, self.line_color, (0 + self.gutter_width, 0), (0 + self.gutter_width, self.height), self.line_width)
-            pygame.draw.line(canvas, self.line_color, (self.width - self.gutter_width, 0), (self.width - self.gutter_width, self.height), self.line_width)
-            pygame.draw.line(canvas, self.line_color, (self.width // 2, 0), (self.width // 2, self.height), self.line_width)
+        pygame.draw.line(canvas, self.line_color, (self.gutter_width, 0), (self.gutter_width, self.height), self.line_width)
+        pygame.draw.line(canvas, self.line_color, (self.width - self.gutter_width, 0), (self.width - self.gutter_width, self.height), self.line_width)
+        pygame.draw.line(canvas, self.line_color, (self.half_width, 0), (self.half_width, self.height), self.line_width)
 
-#Ball Class
+#Ball class
 class Ball:
     def __init__(self, pos, vel, radius, color):
-        self.pos = [pos[0], pos[1]]
+        self.pos = pos
         self.pos_x = int(self.pos[0])
         self.pos_y = int(self.pos[1])
-        self.vel = [vel[0], vel[1]]
+        self.vel = vel
         self.radius = radius
-        self.direction = 'left'
+        self.direction = 0
         self.color = color
-
-    def set_color(self, color):
-        self.color = color
+        self.new_pos = (0, 0)
 
     def spawn_ball(self):
-        self.pos = [my_canvas.get_half_width(), my_canvas.get_half_height()]
+        #Reset ball position to center, and select a random velocity
+        self.pos = my_canvas.center
         self.vel = spawn_ball(self.direction)
 
-    def get_vel(self):
-        return self.vel
-
     def update(self):
-        self.pos[0] += self.vel[0]
-        self.pos[1] += self.vel[1]
+        #Update ball's position
+        self.pos = (self.pos[0] + self.vel[0], self.pos[1] + self.vel[1])
         self.pos_x = int(self.pos[0])
         self.pos_y = int(self.pos[1])
-        
+
         #Check for vertical collisions
-        if self.pos[1] - self.radius <= 0:
-            self.vel[1] = self.vel[1] * -1
-        elif self.pos[1] + self.radius >= my_canvas.get_height():
-            self.vel[1] = self.vel[1] * -1
-            
+        #if ball.pos - radius hits ceiling or if ball.pos + radius hits the floor
+        if (self.pos[1] - self.radius <= 0) or (self.pos[1] + self.radius >= my_canvas.height):
+            self.new_vel
+            self.vel = (self.vel[0], self.vel[1] * -1)
+
         #Check for collisions with gutter and with paddles
-        if self.pos[0] - self.radius <= my_canvas.get_width() - my_canvas.get_width() + my_canvas.get_gutter_width():
-            if (self.pos[1] < paddle1.get_pos()[0][1]) and (self.pos[1] > paddle1.get_pos()[2][1]):
-                self.vel[0] *= -1.05
+        #Check for collision with left paddle or gutter
+        if self.pos[0] - self.radius <= my_canvas.gutter_width:
+            if (self.pos[1] < paddle1.pos[0][1]) and (self.pos[1] > paddle1.pos[2][1]):
+                self.vel = (self.vel[0] * -1.05, self.vel[1])
                 paddle2.ai_ball_coming = True
             else:
                 self.direction = "right"
                 paddle2.ai_ball_coming = True
                 self.spawn_ball()
                 my_gui.score2 += 1
-        if self.pos[0] + self.radius >= my_canvas.get_width() - my_canvas.get_gutter_width():
-            if (self.pos[1] < paddle2.get_pos()[0][1]) and (self.pos[1] > paddle2.get_pos()[2][1]):
-                self.vel[0] *= -1.05
+        #Check for collision with right paddle or gutter
+        if self.pos[0] + self.radius >= my_canvas.width - my_canvas.gutter_width:
+            if (self.pos[1] < paddle2.pos[0][1]) and (self.pos[1] > paddle2.pos[2][1]):
+                self.vel = (self.vel[0] * -1.05, self.vel[1])
                 paddle2.ai_ball_coming = False
             else:
                 paddle2.ai_ball_coming = False
                 self.direction = "left"
                 self.spawn_ball()
                 my_gui.score1 += 1
-
+        #If my_gui.paused: Set color to black, pos to center, and velocity to 0. Else, set color to white.
         if my_gui.paused:
-            self.set_color((0, 0, 0))
-            self.pos = my_canvas.get_center()
-            self.vel = [0, 0]
+            self.color = (0, 0, 0)
+            self.pos = my_canvas.center
+            self.vel = (0, 0)
         else:
-            self.set_color((255, 255, 255))
-            
+            self.color = (255, 255, 255)
 
     def draw(self, canvas):
-        pygame.draw.circle(canvas, self.color, [self.pos_x, self.pos_y], 20)
+        pygame.draw.circle(canvas, self.color, (self.pos_x, self.pos_y), 20)
 
-#Class for Paddles
+#Class for paddles
 class Paddle:
-    def __init__(self, pos, width, height, color, ai = True):
-        self.pos = pos
+    def __init__(self, pos_init, width, height, color, ai = True):
+        self.pos_init = pos_init
         self.vel = 0
         self.width = width
         self.height = height
+        self.half_height = height // 2
+        self.pos = ((self.pos_init[0], self.pos_init[1] - self.half_height), (self.pos_init[0] + self.width, self.pos_init[1] - self.half_height),
+                    (self.pos_init[0] + self.width, self.pos_init[1] + self.half_height), (self.pos_init[0], self.pos_init[1] + self.half_height))
         self.color = color
         self.line_width = 1
         self.ai = ai
         self.ai_ball_coming = False
 
-    #Updates paddle position, only if the paddle will stay on the screen
+    #Updates paddle pos, only if paddle will say on screen
     def update(self):
-        age = 0
-
-        if (self.pos[0][1] + self.vel >= self.height) and self.vel < my_canvas.get_height() - my_canvas.get_height():
-            self.pos[0][1] += self.vel
-            self.pos[1][1] += self.vel
-            self.pos[2][1] += self.vel
-            self.pos[3][1] += self.vel
-        elif (self.pos[3][1] + self.vel <= my_canvas.get_height() - self.height) and self.vel > my_canvas.get_height() - my_canvas.get_height():
-            self.pos[0][1] += self.vel
-            self.pos[1][1] += self.vel
-            self.pos[2][1] += self.vel
-            self.pos[3][1] += self.vel
+        #Updates paddle's position. This will be cleaner
+        if (self.pos[3][1] - self.vel >= self.height) and self.vel < 0:
+            self.pos_init = (self.pos_init[0], self.pos_init[1] + self.vel)
+            self.pos = ((self.pos_init[0], self.pos_init[1] - self.half_height), (self.pos_init[0] + self.width, self.pos_init[1] - self.half_height),
+                        (self.pos_init[0] + self.width, self.pos_init[1] + self.half_height), (self.pos_init[0], self.pos_init[1] + self.half_height))
+        elif (self.pos[0][1] + self.vel <= my_canvas.height - self.height) and self.vel > 0:
+            self.pos_init = (self.pos_init[0], self.pos_init[1] + self.vel)
+            self.pos = ((self.pos_init[0], self.pos_init[1] - self.half_height), (self.pos_init[0] + self.width, self.pos_init[1] - self.half_height),
+                        (self.pos_init[0] + self.width, self.pos_init[1] + self.half_height), (self.pos_init[0], self.pos_init[1] + self.half_height))
 
         #AI for paddle2
-        if self.ai == True:
-            if self.ai_ball_coming == True:
-                while age < 50:
-                    if (my_ball.pos[1] > self.pos[0][1]) and (my_ball.pos[1] < self.pos[2][1]):
-                        self.vel = 0
-                        age += 0.1
-                    elif (my_ball.pos[1] < self.pos[0][1] - 25):
-                        self.vel = -7
-                        age += 0.1
-                    elif (my_ball.pos[1] > self.pos[3][1] + 25):
-                        self.vel = 7
-                        age += 0.1
-                        
+        if self.ai:
+            if self.ai_ball_coming:
+                if (my_ball.pos[1] > self.pos[0][1]) and (my_ball.pos[1] < self.pos[2][1]):
+                    self.vel = 0
+                elif (my_ball.pos[1] < self.pos[0][1] - 25):
+                    self.vel = -7
+                elif (my_ball.pos[1] > self.pos[3][1] + 25):
+                    self.vel = 7
+
     def draw(self, canvas):
         pygame.draw.polygon(canvas, self.color, self.pos)
 
-    def set_vel(self, new_vel):
-        self.vel = new_vel
-
-    def get_pos(self):
-        return self.pos
-    
 #Class for GUI. Keeps track of score, if the game is paused, and will eventually have a timer
 class GUI:
     def __init__(self):
@@ -196,33 +152,22 @@ class GUI:
         self.paused = False
 
     def draw(self, canvas):
-        #font = pygame.font.Font('arial.ttf', 56)
         font = pygame.font.Font(None, 56)
-        canvas.blit(font.render(str(self.score1), True, (255, 255, 255)), (my_canvas.get_width() * 0.33, 45))
-        canvas.blit(font.render(str(self.score2), True, (255, 255, 255)), (my_canvas.get_width() * 0.66, 45))
-
-            
+        canvas.blit(font.render(str(self.score1), True, (255, 255, 255)), (my_canvas.width * 0.33, 45))
+        canvas.blit(font.render(str(self.score2), True, (255, 255, 255)), (my_canvas.width * 0.66, 45))
 
 
 fpsClock = pygame.time.Clock()
-my_canvas = Canvas("Pygame Pong", canvas_size("large"), 8, (150, 150, 150), (255, 255, 255))
+my_canvas = Canvas("Pygame Pong", canvas_size("medium"), 8, (150, 150, 150), (255, 255, 255))
 my_gui = GUI()
-my_ball = Ball(my_canvas.get_center(), spawn_ball(random_direction()), 20, (255, 255, 255))
-paddle1 = Paddle([[0, my_canvas.get_half_height() + 40], 
-                  [8, my_canvas.get_half_height() + 40], 
-                  [8, my_canvas.get_half_height() - 40], 
-                  [0, my_canvas.get_half_height() - 40]], my_canvas.get_gutter_width(), 79, my_canvas.get_line_color())
-paddle2 = Paddle([[my_canvas.get_width() - 8, my_canvas.get_half_height() + 40], 
-                  [my_canvas.get_width(), my_canvas.get_half_height() + 40], 
-                  [my_canvas.get_width(), my_canvas.get_half_height() - 40], 
-                  [my_canvas.get_width() - 8, my_canvas.get_half_height() - 40]], my_canvas.get_gutter_width(), 79, 
-                  my_canvas.get_line_color())
-
-canvas = pygame.display.set_mode(my_canvas.get_size())
-pygame.display.set_caption(my_canvas.get_name())
+my_ball = Ball(my_canvas.center, spawn_ball(0), 20, (255, 255, 255))
+paddle1 = Paddle((0, my_canvas.half_height), my_canvas.gutter_width, 78, my_canvas.line_color, False)
+paddle2 = Paddle((my_canvas.width - my_canvas.gutter_width, my_canvas.half_height), my_canvas.gutter_width, 78, my_canvas.line_color)
+canvas = pygame.display.set_mode(my_canvas.size)
+pygame.display.set_caption(my_canvas.name)
 
 while True:
-    canvas.fill(my_canvas.get_color())
+    canvas.fill(my_canvas.canvas_color)
     my_gui.draw(canvas)
     my_canvas.draw(canvas)
     my_ball.update()
@@ -237,13 +182,13 @@ while True:
             pygame.quit()
         elif event.type == KEYDOWN:
             if event.key == K_UP:
-                paddle2.set_vel(-7)
+                paddle2.vel = -7
             elif event.key == K_DOWN:
-                paddle2.set_vel(7)
+                paddle2.vel = 7
             if event.key == K_w:
-                paddle1.set_vel(-7)
+                paddle1.vel = -7
             elif event.key == K_s:
-                paddle1.set_vel(7)
+                paddle1.vel = 7
             if event.key == K_SPACE:
                 if my_gui.paused == False:
                     my_gui.paused = True
@@ -255,9 +200,9 @@ while True:
                 pygame.quit()
         elif event.type == KEYUP:
             if event.key == K_UP or event.key == K_DOWN:
-                paddle2.set_vel(0)
+                paddle2.vel = 0
             if event.key == K_w or event.key == K_s:
-                paddle1.set_vel(0)
+                paddle1.vel = 0
 
     pygame.display.update()
     fpsClock.tick(60)
